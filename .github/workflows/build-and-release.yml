@@ -69,7 +69,7 @@ jobs:
           lipo -archs "${app}/Contents/MacOS/Beacon" | grep -q arm64
           lipo -archs "${app}/Contents/MacOS/Beacon" | grep -q x86_64
 
-      - name: Create ZIP, DMG, PKG, and checksums
+      - name: Create ZIP, DMG, and PKG
         run: |
           set -euo pipefail
           mkdir -p dist
@@ -101,11 +101,6 @@ jobs:
             --install-location "/Applications" \
             "dist/${package_name}.pkg"
 
-          cd dist
-          for package in "${package_name}.zip" "${package_name}.dmg" "${package_name}.pkg"; do
-            shasum -a 256 "${package}" > "${package}.sha256"
-          done
-
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
@@ -114,7 +109,6 @@ jobs:
             dist/*.dmg
             dist/*.pkg
             dist/*.zip
-            dist/*.sha256
           if-no-files-found: error
           retention-days: 14
 
@@ -143,7 +137,6 @@ jobs:
             dist/*.dmg \
             dist/*.pkg \
             dist/*.zip \
-            dist/*.sha256 \
             --verify-tag \
             --generate-notes \
             --title "Beacon ${GITHUB_REF_NAME}"

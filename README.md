@@ -39,12 +39,34 @@ xcodebuild -project Beacon.xcodeproj -scheme Beacon -configuration Debug build
 
 ## Releases
 
-Every push and pull request to `main` is built and tested by GitHub Actions. Pushing a semantic version tag automatically creates a GitHub Release containing universal DMG, PKG, and ZIP packages with SHA-256 checksums:
+Every push and pull request to `main` is built and tested by GitHub Actions. Pushing a semantic version tag automatically creates a GitHub Release containing universal DMG, PKG, and ZIP packages.
 
-```sh
-git tag v1.0.1
-git push origin v1.0.1
-```
+### Create a release
+
+1. Commit the changes that should be included in the release and push them to `main`:
+
+   ```sh
+   git add -A
+   git commit -m "Prepare Beacon 1.0.1"
+   git push origin main
+   ```
+
+2. Create an annotated tag on that commit and push it to GitHub:
+
+   ```sh
+   git tag -a v1.0.1 -m "Beacon 1.0.1"
+   git push origin v1.0.1
+   ```
+
+3. Follow the build in [GitHub Actions](https://github.com/dhkey/Beacon/actions). When it succeeds, the new version appears on the [Releases page](https://github.com/dhkey/Beacon/releases).
+
+Each release must use a new tag in the exact `vMAJOR.MINOR.PATCH` format, for example:
+
+- `v1.0.2` for a bug-fix release
+- `v1.1.0` for a feature release
+- `v2.0.0` for a major release with breaking changes
+
+The workflow uses the contents of the tagged commit, so push and tag the final release-ready commit.
 
 ## Install a release
 
@@ -62,6 +84,10 @@ The PKG provides a guided installer, while the ZIP contains the standalone appli
 4. Press `Return` to open the selected result, or `Esc` to dismiss Beacon.
 
 Open **Beacon Settings** from the launcher or menu-bar item to record a different global shortcut or rebuild the application index.
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing instructions, and pull request guidelines.
 
 ## Tests
 
