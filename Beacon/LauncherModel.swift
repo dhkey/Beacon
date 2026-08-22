@@ -56,14 +56,22 @@ final class LauncherModel {
     var query = "" {
         didSet {
             selectedIndex = 0
+            isSettingsButtonSelected = false
             rebuildResults()
         }
     }
     var results: [LauncherResult] = []
     var selectedIndex = 0
+    private(set) var isSettingsButtonSelected = false
     var isIndexing = false
     var shortcutRegistrationError: String?
     private(set) var favoriteIDs: [String]
+
+    var canReorderFavoriteForSelection: Bool {
+        Self.normalized(query).isEmpty
+            && !isSettingsButtonSelected
+            && results.indices.contains(selectedIndex)
+    }
 
     var onDismiss: (() -> Void)?
     var onOpenSettings: (() -> Void)?
@@ -103,6 +111,7 @@ final class LauncherModel {
     func prepareForPresentation() {
         query = ""
         selectedIndex = 0
+        isSettingsButtonSelected = false
     }
 
     func loadApplications() {
@@ -131,11 +140,51 @@ final class LauncherModel {
     }
 
     func moveSelection(by offset: Int) {
-        guard !results.isEmpty else { return }
-        selectedIndex = min(max(selectedIndex + offset, 0), results.count - 1)
+        guard offset != 0 else { return }
+        guard !results.isEmpty else {
+            if offset > 0 {
+                isSettingsButtonSelected = true
+            }
+            return
+        }
+
+        let currentPosition = isSettingsButtonSelected ? results.count : selectedIndex
+        let nextPosition = min(max(currentPosition + offset, 0), results.count)
+        isSettingsButtonSelected = nextPosition == results.count
+        selectedIndex = min(nextPosition, results.count - 1)
+    }
+
+    func selectResult(at index: Int) {
+        guard results.indices.contains(index) else { return }
+        selectedIndex = index
+        isSettingsButtonSelected = false
+    }
+
+    func moveFavoriteForSelection(by offset: Int) {
+        guard canReorderFavoriteForSelection, offset != 0 else { return }
+
+        let destinationIndex = selectedIndex + offset
+        guard results.indices.contains(destinationIndex) else { return }
+
+        let selectedID = results[selectedIndex].id
+        let destinationID = results[destinationIndex].id
+        guard let favoriteIndex = favoriteIDs.firstIndex(of: selectedID),
+              let destinationFavoriteIndex = favoriteIDs.firstIndex(of: destinationID) else { return }
+
+        favoriteIDs.swapAt(favoriteIndex, destinationFavoriteIndex)
+        defaults.set(favoriteIDs, forKey: Keys.favoriteIDs)
+        rebuildResults()
+
+        if let reorderedIndex = results.firstIndex(where: { $0.id == selectedID }) {
+            selectedIndex = reorderedIndex
+        }
     }
 
     func runSelected() {
+        if isSettingsButtonSelected {
+            openSettings()
+            return
+        }
         guard results.indices.contains(selectedIndex) else { return }
         run(results[selectedIndex])
     }
@@ -145,8 +194,7 @@ final class LauncherModel {
         case .application(let url):
             NSWorkspace.shared.openApplication(at: url, configuration: .init())
         case .settings:
-            dismiss()
-            onOpenSettings?()
+            openSettings()
             return
         case .url(let url):
             NSWorkspace.shared.open(url)
@@ -160,6 +208,7 @@ final class LauncherModel {
 
     @discardableResult
     func toggleFavoriteForSelection() -> Bool {
+        guard !isSettingsButtonSelected else { return false }
         guard results.indices.contains(selectedIndex) else { return false }
         let result = results[selectedIndex]
         guard result.id != "command:web-search" else { return false }
@@ -179,6 +228,11 @@ final class LauncherModel {
 
     func dismiss() {
         onDismiss?()
+    }
+
+    func openSettings() {
+        dismiss()
+        onOpenSettings?()
     }
 
     func updateShortcut(_ shortcut: KeyboardShortcut) {

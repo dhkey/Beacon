@@ -118,6 +118,49 @@ struct BeaconTests {
         #expect(model.results.map(\.id) == ["command:applications", LauncherModel.settingsResultID])
     }
 
+    @Test @MainActor func selectedFavoriteCanBeReorderedAndRestored() {
+        let suiteName = "BeaconTests.selectedFavoriteCanBeReorderedAndRestored"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(
+            [LauncherModel.settingsResultID, "missing", "command:applications"],
+            forKey: Self.favoriteIDsKey
+        )
+
+        let model = LauncherModel(defaults: defaults)
+        model.moveFavoriteForSelection(by: 1)
+
+        #expect(model.favoriteIDs == ["command:applications", "missing", LauncherModel.settingsResultID])
+        #expect(model.results.map(\.id) == ["command:applications", LauncherModel.settingsResultID])
+        #expect(model.selectedIndex == 1)
+        #expect(model.results[model.selectedIndex].id == LauncherModel.settingsResultID)
+
+        let restoredModel = LauncherModel(defaults: defaults)
+        #expect(restoredModel.favoriteIDs == model.favoriteIDs)
+        #expect(restoredModel.results.map(\.id) == model.results.map(\.id))
+    }
+
+    @Test @MainActor func favoriteReorderingOnlyAppliesToTheDefaultFavoritesList() {
+        let suiteName = "BeaconTests.favoriteReorderingOnlyAppliesToTheDefaultFavoritesList"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(
+            [LauncherModel.settingsResultID, "command:applications"],
+            forKey: Self.favoriteIDsKey
+        )
+
+        let model = LauncherModel(defaults: defaults)
+        model.moveFavoriteForSelection(by: -1)
+        #expect(model.favoriteIDs == [LauncherModel.settingsResultID, "command:applications"])
+
+        model.query = "settings"
+        #expect(!model.canReorderFavoriteForSelection)
+        model.moveFavoriteForSelection(by: 1)
+        #expect(model.favoriteIDs == [LauncherModel.settingsResultID, "command:applications"])
+    }
+
     @Test @MainActor func searchedResultCanBeFavoritedAndRestored() {
         let suiteName = "BeaconTests.searchedResultCanBeFavoritedAndRestored"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -151,11 +194,16 @@ struct BeaconTests {
         #expect(model.favoriteIDs.isEmpty)
     }
 
-    @Test @MainActor func selectionIsClampedAndResetsForNewQueries() {
+    @Test @MainActor func selectionIncludesSettingsButtonAndResetsForNewQueries() {
         let model = LauncherModel(defaults: isolatedDefaults(named: #function))
         model.query = "applications"
 
         model.moveSelection(by: 100)
+        #expect(model.isSettingsButtonSelected)
+        #expect(model.selectedIndex == model.results.count - 1)
+
+        model.moveSelection(by: -1)
+        #expect(!model.isSettingsButtonSelected)
         #expect(model.selectedIndex == model.results.count - 1)
 
         model.moveSelection(by: -100)
@@ -165,8 +213,26 @@ struct BeaconTests {
         #expect(model.selectedIndex == 1)
 
         model.query = "settings"
+        #expect(!model.isSettingsButtonSelected)
         #expect(model.selectedIndex == 0)
         #expect(model.results.first?.id == LauncherModel.settingsResultID)
+    }
+
+    @Test @MainActor func runningSelectedSettingsButtonDismissesLauncherAndOpensSettings() {
+        let model = LauncherModel(defaults: isolatedDefaults(named: #function))
+        var dismissalCount = 0
+        var settingsOpenCount = 0
+        model.onDismiss = { dismissalCount += 1 }
+        model.onOpenSettings = { settingsOpenCount += 1 }
+
+        model.moveSelection(by: 1)
+        #expect(model.isSettingsButtonSelected)
+        #expect(!model.toggleFavoriteForSelection())
+
+        model.runSelected()
+
+        #expect(dismissalCount == 1)
+        #expect(settingsOpenCount == 1)
     }
 
     @Test @MainActor func runningSettingsDismissesLauncherAndOpensSettings() {

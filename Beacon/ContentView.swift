@@ -26,7 +26,10 @@ struct ContentView: View {
         .background(Color.beaconCanvas)
         .preferredColorScheme(.light)
         .task {
-            model.onOpenSettings = { openSettings() }
+            model.onOpenSettings = {
+                NSApp.activate(ignoringOtherApps: true)
+                openSettings()
+            }
             await focusSearch()
         }
         .onReceive(NotificationCenter.default.publisher(for: .beaconDidShow)) { _ in
@@ -35,12 +38,25 @@ struct ContentView: View {
         .onExitCommand {
             model.dismiss()
         }
-        .onKeyPress(.upArrow) {
+        .onKeyPress(.upArrow, phases: [.down, .repeat]) { keyPress in
+            if keyPress.modifiers.contains(.option), model.canReorderFavoriteForSelection {
+                model.moveFavoriteForSelection(by: -1)
+                return .handled
+            }
             model.moveSelection(by: -1)
             return .handled
         }
-        .onKeyPress(.downArrow) {
+        .onKeyPress(.downArrow, phases: [.down, .repeat]) { keyPress in
+            if keyPress.modifiers.contains(.option), model.canReorderFavoriteForSelection {
+                model.moveFavoriteForSelection(by: 1)
+                return .handled
+            }
             model.moveSelection(by: 1)
+            return .handled
+        }
+        .onKeyPress(.return) {
+            guard model.isSettingsButtonSelected else { return .ignored }
+            model.runSelected()
             return .handled
         }
         .onKeyPress("k", phases: .down) { keyPress in
@@ -95,11 +111,11 @@ struct ContentView: View {
                         ForEach(Array(model.results.enumerated()), id: \.element.id) { index, result in
                             ResultRow(
                                 result: result,
-                                isSelected: index == model.selectedIndex,
+                                isSelected: !model.isSettingsButtonSelected && index == model.selectedIndex,
                                 isFavorite: model.isFavorite(result),
                                 onPointerMove: { updateSelectionFromPointer(to: index) },
                                 onRun: {
-                                    model.selectedIndex = index
+                                    model.selectResult(at: index)
                                     model.runSelected()
                                 }
                             )
@@ -128,15 +144,20 @@ struct ContentView: View {
             Label("Open", systemImage: "return")
             Label("Navigate", systemImage: "arrow.up.arrow.down")
             Label("Favorite ⌘K", systemImage: "star")
+            Text("Hold ⌥ and press ↑↓ to rearrange")
             Spacer()
-            SettingsLink {
+            Button {
+                model.openSettings()
+            } label: {
                 Label("Settings", systemImage: "gearshape")
+                    .padding(.horizontal, 8)
+                    .frame(height: 26)
+                    .background(model.isSettingsButtonSelected ? Color.beaconSelection : .clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("openSettingsButton")
-            .simultaneousGesture(TapGesture().onEnded {
-                model.dismiss()
-            })
+            .accessibilityAddTraits(model.isSettingsButtonSelected ? .isSelected : [])
         }
         .font(.system(size: 11, weight: .medium))
         .foregroundStyle(Color.beaconMuted)
@@ -157,7 +178,7 @@ struct ContentView: View {
         let pointerLocation = NSEvent.mouseLocation
         guard pointerLocation != lastPointerLocation else { return }
         lastPointerLocation = pointerLocation
-        model.selectedIndex = index
+        model.selectResult(at: index)
     }
 
     private var emptyStateSymbol: String {

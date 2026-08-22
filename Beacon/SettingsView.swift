@@ -68,7 +68,9 @@ struct SettingsView: View {
         }
         .frame(width: 720, height: 500)
         .background(Color.beaconCanvas)
+        .background(SettingsWindowFocusView())
         .preferredColorScheme(.light)
+        .accessibilityIdentifier("settingsView")
     }
 
     private var appVersion: String {
@@ -94,6 +96,27 @@ struct SettingsView: View {
 
             content()
                 .frame(width: 205, alignment: .leading)
+        }
+    }
+}
+
+private struct SettingsWindowFocusView: NSViewRepresentable {
+    func makeNSView(context: Context) -> SettingsWindowFocusingView {
+        SettingsWindowFocusingView()
+    }
+
+    func updateNSView(_ view: SettingsWindowFocusingView, context: Context) {}
+}
+
+private final class SettingsWindowFocusingView: NSView {
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil else { return }
+
+        DispatchQueue.main.async { [weak self] in
+            guard let window = self?.window else { return }
+            NSApp.activate(ignoringOtherApps: true)
+            window.makeKeyAndOrderFront(nil)
         }
     }
 }

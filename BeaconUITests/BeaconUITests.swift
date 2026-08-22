@@ -56,6 +56,42 @@ final class BeaconUITests: XCTestCase {
         XCTAssertTrue(settingsResult.isSelected)
     }
 
+    @MainActor
+    func testDownArrowSelectsAndOpensFooterSettings() throws {
+        let app = application(favoriteIDs: ["command:settings"])
+        app.launch()
+
+        let searchField = app.textFields["launcherSearchField"]
+        let settingsButton = app.buttons["openSettingsButton"]
+        XCTAssertTrue(searchField.waitForExistence(timeout: 2))
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 2))
+
+        searchField.typeKey(.downArrow, modifierFlags: [])
+        XCTAssertTrue(settingsButton.isSelected)
+        searchField.typeKey(.return, modifierFlags: [])
+
+        XCTAssertTrue(app.otherElements["settingsView"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testOptionDownArrowReordersSelectedFavorite() throws {
+        let app = application(favoriteIDs: ["command:settings", "command:applications"])
+        app.launch()
+
+        let searchField = app.textFields["launcherSearchField"]
+        let settingsResult = app.buttons["openBeaconSettingsResult"]
+        let applicationsResult = app.buttons.matching(identifier: "launcherResult").firstMatch
+        XCTAssertTrue(searchField.waitForExistence(timeout: 2))
+        XCTAssertTrue(settingsResult.waitForExistence(timeout: 2))
+        XCTAssertTrue(applicationsResult.waitForExistence(timeout: 2))
+        XCTAssertTrue(settingsResult.isSelected)
+
+        searchField.typeKey(.downArrow, modifierFlags: .option)
+
+        XCTAssertTrue(settingsResult.isSelected)
+        XCTAssertLessThan(applicationsResult.frame.minY, settingsResult.frame.minY)
+    }
+
     private func application(favoriteIDs: [String]) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["BEACON_UI_TESTING"] = "1"
