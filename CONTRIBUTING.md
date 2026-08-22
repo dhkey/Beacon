@@ -43,6 +43,49 @@ xcodebuild -project Beacon.xcodeproj -scheme Beacon -configuration Debug build
 4. Add or update tests when behavior changes.
 5. Avoid committing build products, local Xcode user data, or unrelated formatting changes.
 
+## Branch and commit naming
+
+Use a short, lowercase, kebab-case branch name with a category prefix:
+
+- `feature/global-shortcut-presets`
+- `fix/search-selection-reset`
+- `docs/release-instructions`
+- `refactor/application-indexing`
+- `test/fuzzy-matching`
+- `chore/update-workflow`
+
+Write commit messages in the [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+```text
+type(optional-scope): short imperative summary
+```
+
+Use one of these commit types:
+
+- `feat`: a user-facing feature
+- `fix`: a bug fix
+- `docs`: documentation only
+- `refactor`: an internal change without new behavior or a bug fix
+- `test`: adding or correcting tests
+- `perf`: a performance improvement
+- `style`: formatting that does not change behavior
+- `build`: build system or dependency changes
+- `ci`: continuous-integration changes
+- `chore`: repository maintenance not covered above
+
+Examples:
+
+```text
+feat(shortcuts): add preset key combinations
+fix(search): reset selection after updating results
+docs: explain how to create a release
+ci: remove checksum artifacts
+```
+
+Keep the summary concise, start it with a lowercase imperative verb, and do not end it with a period. Keep commits focused on one logical change; avoid messages such as `update`, `changes`, `fix stuff`, or `WIP` in the final pull request history.
+
+Use the commit body to explain why a non-obvious change is needed. Reference related issues with `Refs #123` or close them with `Closes #123`. Mark an incompatible change with a `BREAKING CHANGE:` footer.
+
 ## Testing
 
 Run the test suite before opening a pull request:
