@@ -37,6 +37,17 @@ You can also build from the command line:
 xcodebuild -project Beacon.xcodeproj -scheme Beacon -configuration Debug build
 ```
 
+## Releases
+
+Every push and pull request to `main` is built and tested by GitHub Actions. Pushing a semantic version tag automatically creates a GitHub Release containing a universal macOS application and its SHA-256 checksum:
+
+```sh
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The release is ad-hoc signed because the project does not use a paid Apple Developer account. After downloading and unzipping Beacon, Control-click **Beacon.app**, choose **Open**, and confirm the macOS security prompt. Developer ID signing and notarization can be added later without changing the release process.
+
 ## Usage
 
 1. Press `⌥ Space` to show or hide Beacon.

@@ -1,0 +1,124 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Beacon
+    runs-on: macos-26
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Run unit tests
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -project Beacon.xcodeproj \
+            -scheme Beacon \
+            -destination "platform=macOS" \
+            -derivedDataPath test-build \
+            -only-testing:BeaconTests \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Build universal release
+        run: |
+          set -euo pipefail
+
+          version="0.0.0"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Release tags must use the format v1.2.3" >&2
+              exit 1
+            fi
+            version="${GITHUB_REF_NAME#v}"
+          fi
+
+          xcodebuild build \
+            -project Beacon.xcodeproj \
+            -scheme Beacon \
+            -configuration Release \
+            -destination "generic/platform=macOS" \
+            -derivedDataPath build \
+            ARCHS="arm64 x86_64" \
+            ONLY_ACTIVE_ARCH=NO \
+            MARKETING_VERSION="${version}" \
+            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Ad-hoc sign and verify application
+        run: |
+          set -euo pipefail
+          app="build/Build/Products/Release/Beacon.app"
+          codesign --force --deep --options runtime --sign - "${app}"
+          codesign --verify --deep --strict --verbose=2 "${app}"
+          lipo -archs "${app}/Contents/MacOS/Beacon" | grep -q arm64
+          lipo -archs "${app}/Contents/MacOS/Beacon" | grep -q x86_64
+
+      - name: Package application and checksum
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            archive="Beacon-${GITHUB_REF_NAME}.zip"
+          else
+            archive="Beacon-build-${GITHUB_RUN_NUMBER}.zip"
+          fi
+
+          ditto -c -k --sequesterRsrc --keepParent \
+            "build/Build/Products/Release/Beacon.app" \
+            "dist/${archive}"
+          cd dist
+          shasum -a 256 "${archive}" > "${archive}.sha256"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Beacon-build
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release files
+        uses: actions/download-artifact@v4
+        with:
+          name: Beacon-build
+          path: dist
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "${GITHUB_REF_NAME}" \
+            dist/*.zip \
+            dist/*.sha256 \
+            --verify-tag \
+            --generate-notes \
+            --title "Beacon ${GITHUB_REF_NAME}"
