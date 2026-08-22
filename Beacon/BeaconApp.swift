@@ -36,7 +36,7 @@ struct BeaconApp: App {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    let model = LauncherModel()
+    let model: LauncherModel
 
     private static let applicationIndexCheckInterval: TimeInterval = 24 * 60 * 60
 
@@ -45,7 +45,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotKeyManager = GlobalHotKeyManager()
     private var isDuplicateInstance = false
 
+    override init() {
+        model = Self.makeModel()
+        super.init()
+    }
+
     func applicationWillFinishLaunching(_ notification: Notification) {
+        guard !Self.isRunningUnitTests else { return }
         guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
         let currentProcessIdentifier = ProcessInfo.processInfo.processIdentifier
         isDuplicateInstance = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
@@ -97,5 +103,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func applyShortcut(_ shortcut: KeyboardShortcut) {
         model.shortcutRegistrationError = hotKeyManager.register(shortcut: shortcut)
+    }
+
+    private static var isRunningUnitTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
+    private static func makeModel() -> LauncherModel {
+#if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        if environment["BEACON_UI_TESTING"] == "1" {
+            let suiteName = "BeaconUITests"
+            let defaults = UserDefaults(suiteName: suiteName)!
+            defaults.removePersistentDomain(forName: suiteName)
+
+            if let favoriteIDs = environment["BEACON_UI_TEST_FAVORITE_IDS"] {
+                defaults.set(
+                    favoriteIDs.split(separator: "\n").map(String.init),
+                    forKey: "launcherFavoriteIDs"
+                )
+            }
+            return LauncherModel(defaults: defaults)
+        }
+#endif
+        return LauncherModel()
     }
 }

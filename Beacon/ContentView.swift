@@ -5,12 +5,14 @@
 //  Created by Denys Yazan on 22.08.2026.
 //
 
+import AppKit
 import SwiftUI
 
 struct ContentView: View {
     @Environment(\.openSettings) private var openSettings
     @Bindable var model: LauncherModel
     @FocusState private var searchFocused: Bool
+    @State private var lastPointerLocation: NSPoint?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,6 +26,7 @@ struct ContentView: View {
         .background(Color.beaconCanvas)
         .preferredColorScheme(.light)
         .task {
+            model.onOpenSettings = { openSettings() }
             await focusSearch()
         }
         .onReceive(NotificationCenter.default.publisher(for: .beaconDidShow)) { _ in
@@ -39,6 +42,13 @@ struct ContentView: View {
         .onKeyPress(.downArrow) {
             model.moveSelection(by: 1)
             return .handled
+        }
+        .onKeyPress("k", phases: .down) { keyPress in
+            guard keyPress.modifiers.contains(.command) else { return .ignored }
+            return model.toggleFavoriteForSelection() ? .handled : .ignored
+        }
+        .onChange(of: model.query) { _, _ in
+            lastPointerLocation = NSEvent.mouseLocation
         }
     }
 
@@ -62,52 +72,20 @@ struct ContentView: View {
 
     @ViewBuilder
     private var results: some View {
-        if model.query.isEmpty {
-            VStack(spacing: 0) {
-                SettingsLink {
-                    HStack(spacing: 13) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(Color.beaconInk)
-                            .frame(width: 38, height: 38)
-                            .background(Color(red: 0.94, green: 0.91, blue: 0.88))
-                            .clipShape(RoundedRectangle(cornerRadius: 9))
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Open Beacon Settings")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(Color.beaconInk)
-                            Text("Shortcut and launcher preferences")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Color.beaconMuted)
-                        }
-
-                        Spacer()
-                    }
-                    .padding(.horizontal, 12)
-                    .frame(height: 58)
-                    .contentShape(Rectangle())
-                    .background(Color.beaconSelection)
-                    .clipShape(RoundedRectangle(cornerRadius: 9))
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("openBeaconSettingsResult")
-                .simultaneousGesture(TapGesture().onEnded {
-                    model.dismiss()
-                })
-
-                Spacer()
-            }
-            .padding(10)
-        } else if model.results.isEmpty {
+        if model.results.isEmpty {
             VStack(spacing: 10) {
-                Image(systemName: model.isIndexing ? "arrow.trianglehead.2.clockwise.rotate.90" : "text.magnifyingglass")
+                Image(systemName: emptyStateSymbol)
                     .font(.system(size: 26, weight: .medium))
                     .foregroundStyle(Color.beaconMuted)
                     .symbolEffect(.rotate, isActive: model.isIndexing)
-                Text(model.isIndexing ? "Indexing applications" : "No results for “\(model.query)”")
+                Text(emptyStateTitle)
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(Color.beaconMuted)
+                if model.query.isEmpty && !model.isIndexing {
+                    Text("Search for an app or command, then press ⌘K")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.beaconMuted)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -118,15 +96,19 @@ struct ContentView: View {
                             ResultRow(
                                 result: result,
                                 isSelected: index == model.selectedIndex,
-                                onHover: { hovering in
-                                    if hovering { model.selectedIndex = index }
-                                },
+                                isFavorite: model.isFavorite(result),
+                                onPointerMove: { updateSelectionFromPointer(to: index) },
                                 onRun: {
                                     model.selectedIndex = index
                                     model.runSelected()
                                 }
                             )
                             .id(result.id)
+                            .accessibilityIdentifier(
+                                result.id == LauncherModel.settingsResultID
+                                    ? "openBeaconSettingsResult"
+                                    : "launcherResult"
+                            )
                         }
                     }
                     .padding(10)
@@ -145,6 +127,7 @@ struct ContentView: View {
         HStack(spacing: 18) {
             Label("Open", systemImage: "return")
             Label("Navigate", systemImage: "arrow.up.arrow.down")
+            Label("Favorite ⌘K", systemImage: "star")
             Spacer()
             SettingsLink {
                 Label("Settings", systemImage: "gearshape")
@@ -167,19 +150,32 @@ struct ContentView: View {
     }
 
     private func runCurrentSelection() {
-        if model.query.isEmpty {
-            model.dismiss()
-            openSettings()
-        } else {
-            model.runSelected()
-        }
+        model.runSelected()
+    }
+
+    private func updateSelectionFromPointer(to index: Int) {
+        let pointerLocation = NSEvent.mouseLocation
+        guard pointerLocation != lastPointerLocation else { return }
+        lastPointerLocation = pointerLocation
+        model.selectedIndex = index
+    }
+
+    private var emptyStateSymbol: String {
+        if model.isIndexing { return "arrow.trianglehead.2.clockwise.rotate.90" }
+        return model.query.isEmpty ? "star" : "text.magnifyingglass"
+    }
+
+    private var emptyStateTitle: String {
+        if model.isIndexing { return "Indexing applications" }
+        return model.query.isEmpty ? "No favorites yet" : "No results for “\(model.query)”"
     }
 }
 
 private struct ResultRow: View {
     let result: LauncherResult
     let isSelected: Bool
-    let onHover: (Bool) -> Void
+    let isFavorite: Bool
+    let onPointerMove: () -> Void
     let onRun: () -> Void
 
     var body: some View {
@@ -199,6 +195,13 @@ private struct ResultRow: View {
                 }
 
                 Spacer(minLength: 12)
+
+                if isFavorite {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.beaconMuted)
+                        .accessibilityLabel("Favorite")
+                }
 
                 if isSelected {
                     Text("↵")
@@ -221,7 +224,12 @@ private struct ResultRow: View {
             .clipShape(RoundedRectangle(cornerRadius: 9))
         }
         .buttonStyle(.plain)
-        .onHover(perform: onHover)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .onContinuousHover { phase in
+            if case .active = phase {
+                onPointerMove()
+            }
+        }
     }
 }
 

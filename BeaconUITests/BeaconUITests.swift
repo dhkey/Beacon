@@ -10,32 +10,56 @@ import XCTest
 final class BeaconUITests: XCTestCase {
 
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
-    }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
-        let app = XCUIApplication()
+    func testSettingsCanBeSearchedAndUnfavorited() throws {
+        let app = application(favoriteIDs: ["command:settings"])
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        let settingsResult = app.buttons["openBeaconSettingsResult"]
+        XCTAssertTrue(settingsResult.waitForExistence(timeout: 2))
+
+        let searchField = app.textFields["launcherSearchField"]
+        searchField.click()
+        searchField.typeText("settings")
+        XCTAssertTrue(settingsResult.waitForExistence(timeout: 2))
+
+        searchField.typeKey("k", modifierFlags: .command)
+        searchField.typeKey("a", modifierFlags: .command)
+        searchField.typeKey(.delete, modifierFlags: [])
+
+        XCTAssertTrue(app.staticTexts["No favorites yet"].waitForExistence(timeout: 2))
     }
 
     @MainActor
-    func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
-        measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
-        }
+    func testSearchKeepsFirstResultSelectedUnderStationaryPointer() throws {
+        let app = application(favoriteIDs: ["command:settings", "command:applications"])
+        app.launch()
+
+        let searchField = app.textFields["launcherSearchField"]
+        XCTAssertTrue(searchField.waitForExistence(timeout: 2))
+        searchField.click()
+
+        let applicationsResult = app.buttons.matching(identifier: "launcherResult").firstMatch
+        XCTAssertTrue(applicationsResult.waitForExistence(timeout: 2))
+        applicationsResult
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .hover()
+        XCTAssertTrue(applicationsResult.isSelected)
+
+        searchField.typeText("settings")
+
+        let settingsResult = app.buttons["openBeaconSettingsResult"]
+        XCTAssertTrue(settingsResult.waitForExistence(timeout: 2))
+        XCTAssertTrue(settingsResult.isSelected)
+    }
+
+    private func application(favoriteIDs: [String]) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchEnvironment["BEACON_UI_TESTING"] = "1"
+        app.launchEnvironment["BEACON_UI_TEST_FAVORITE_IDS"] = favoriteIDs.joined(separator: "\n")
+        return app
     }
 }

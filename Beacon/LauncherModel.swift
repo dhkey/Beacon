@@ -26,6 +26,7 @@ struct IndexedApplication: Identifiable, Hashable {
 
 enum LauncherTarget: Hashable {
     case application(URL)
+    case settings
     case url(URL)
 }
 
@@ -50,6 +51,8 @@ struct LauncherResult: Identifiable, Hashable {
 @MainActor
 @Observable
 final class LauncherModel {
+    static let settingsResultID = "command:settings"
+
     var query = "" {
         didSet {
             selectedIndex = 0
@@ -60,8 +63,10 @@ final class LauncherModel {
     var selectedIndex = 0
     var isIndexing = false
     var shortcutRegistrationError: String?
+    private(set) var favoriteIDs: [String]
 
     var onDismiss: (() -> Void)?
+    var onOpenSettings: (() -> Void)?
     var onShortcutChanged: ((KeyboardShortcut) -> Void)?
 
     var shortcut: KeyboardShortcut {
@@ -78,6 +83,11 @@ final class LauncherModel {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        if let savedFavoriteIDs = defaults.stringArray(forKey: Keys.favoriteIDs) {
+            favoriteIDs = Self.unique(savedFavoriteIDs)
+        } else {
+            favoriteIDs = [Self.settingsResultID]
+        }
         if defaults.object(forKey: Keys.keyCode) != nil {
             shortcut = KeyboardShortcut(
                 kind: KeyboardShortcut.Kind(rawValue: defaults.integer(forKey: Keys.shortcutKind)) ?? .keyCombination,
@@ -134,10 +144,37 @@ final class LauncherModel {
         switch result.target {
         case .application(let url):
             NSWorkspace.shared.openApplication(at: url, configuration: .init())
+        case .settings:
+            dismiss()
+            onOpenSettings?()
+            return
         case .url(let url):
             NSWorkspace.shared.open(url)
         }
         dismiss()
+    }
+
+    func isFavorite(_ result: LauncherResult) -> Bool {
+        favoriteIDs.contains(result.id)
+    }
+
+    @discardableResult
+    func toggleFavoriteForSelection() -> Bool {
+        guard results.indices.contains(selectedIndex) else { return false }
+        let result = results[selectedIndex]
+        guard result.id != "command:web-search" else { return false }
+
+        if let index = favoriteIDs.firstIndex(of: result.id) {
+            favoriteIDs.remove(at: index)
+        } else {
+            favoriteIDs.append(result.id)
+        }
+        defaults.set(favoriteIDs, forKey: Keys.favoriteIDs)
+
+        if Self.normalized(query).isEmpty {
+            rebuildResults()
+        }
+        return true
     }
 
     func dismiss() {
@@ -168,7 +205,8 @@ final class LauncherModel {
         })
 
         if normalizedQuery.isEmpty {
-            results = []
+            let candidatesByID = Dictionary(uniqueKeysWithValues: candidates.map { ($0.id, $0) })
+            results = favoriteIDs.compactMap { candidatesByID[$0] }
         } else {
             results = candidates.compactMap { candidate -> (LauncherResult, Int)? in
                 guard let score = Self.matchScore(query: normalizedQuery, candidate: Self.normalized(candidate.title + " " + candidate.subtitle)) else {
@@ -202,6 +240,15 @@ final class LauncherModel {
 
     private func commandResults() -> [LauncherResult] {
         return [
+            LauncherResult(
+                id: Self.settingsResultID,
+                title: "Beacon Settings",
+                subtitle: "Shortcut and launcher preferences",
+                symbolName: "gearshape.fill",
+                tint: Color(red: 0.94, green: 0.91, blue: 0.88),
+                icon: nil,
+                target: .settings
+            ),
             LauncherResult(
                 id: "command:applications",
                 title: "Applications",
@@ -245,6 +292,11 @@ final class LauncherModel {
         urls.contains { !indexedPaths.contains($0.standardizedFileURL.path) }
     }
 
+    nonisolated private static func unique(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.filter { seen.insert($0).inserted }
+    }
+
     nonisolated private static func discoverApplicationURLs() -> [URL] {
         let roots = [
             URL(filePath: "/Applications", directoryHint: .isDirectory),
@@ -283,23 +335,13 @@ final class LauncherModel {
         static let shortcutKind = "launcherShortcutKind"
         static let keyCode = "launcherShortcutKeyCode"
         static let modifiers = "launcherShortcutModifiers"
+        static let favoriteIDs = "launcherFavoriteIDs"
     }
 }
 
 extension LauncherModel {
     static var preview: LauncherModel {
         let model = LauncherModel(defaults: UserDefaults(suiteName: "BeaconPreview")!)
-        model.results = [
-            LauncherResult(
-                id: "preview:applications",
-                title: "Applications",
-                subtitle: "Open folder in Finder",
-                symbolName: "square.grid.2x2.fill",
-                tint: Color(red: 0.95, green: 0.92, blue: 0.88),
-                icon: nil,
-                target: .url(URL(filePath: "/Applications"))
-            )
-        ]
         return model
     }
 }

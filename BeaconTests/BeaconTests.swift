@@ -11,6 +11,8 @@ import Testing
 
 struct BeaconTests {
 
+    private static let favoriteIDsKey = "launcherFavoriteIDs"
+
     @Test func normalizationIgnoresCaseWhitespaceAndDiacritics() {
         #expect(LauncherModel.normalized("  ČalCulator  ") == "calculator")
     }
@@ -82,5 +84,109 @@ struct BeaconTests {
 
         #expect(restoredModel.shortcut == KeyboardShortcut.doubleTap(.command))
         #expect(restoredModel.shortcut.keyCapComponents == ["⌘", "⌘"])
+    }
+
+    @Test @MainActor func removingDefaultFavoritePersistsAnEmptySelection() {
+        let suiteName = "BeaconTests.removingDefaultFavoritePersistsAnEmptySelection"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let model = LauncherModel(defaults: defaults)
+        #expect(model.toggleFavoriteForSelection())
+        #expect(model.results.isEmpty)
+
+        let restoredModel = LauncherModel(defaults: defaults)
+        #expect(restoredModel.results.isEmpty)
+        #expect(restoredModel.favoriteIDs.isEmpty)
+    }
+
+    @Test @MainActor func favoriteOrderAndDeduplicationArePreserved() {
+        let suiteName = "BeaconTests.favoriteOrderAndDeduplicationArePreserved"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(
+            ["command:applications", LauncherModel.settingsResultID, "command:applications", "missing"],
+            forKey: Self.favoriteIDsKey
+        )
+
+        let model = LauncherModel(defaults: defaults)
+
+        #expect(model.favoriteIDs == ["command:applications", LauncherModel.settingsResultID, "missing"])
+        #expect(model.results.map(\.id) == ["command:applications", LauncherModel.settingsResultID])
+    }
+
+    @Test @MainActor func searchedResultCanBeFavoritedAndRestored() {
+        let suiteName = "BeaconTests.searchedResultCanBeFavoritedAndRestored"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let model = LauncherModel(defaults: defaults)
+        model.query = "applications"
+        #expect(model.results.first?.id == "command:applications")
+        #expect(model.toggleFavoriteForSelection())
+        model.query = ""
+
+        #expect(model.results.map(\.id) == [LauncherModel.settingsResultID, "command:applications"])
+
+        let restoredModel = LauncherModel(defaults: defaults)
+        #expect(restoredModel.results.map(\.id) == [LauncherModel.settingsResultID, "command:applications"])
+    }
+
+    @Test @MainActor func webSearchCannotBeFavorited() {
+        let suiteName = "BeaconTests.webSearchCannotBeFavorited"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set([], forKey: Self.favoriteIDsKey)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let model = LauncherModel(defaults: defaults)
+        model.query = "a query with no matching command"
+
+        #expect(model.results.map(\.id) == ["command:web-search"])
+        #expect(!model.toggleFavoriteForSelection())
+        #expect(model.favoriteIDs.isEmpty)
+    }
+
+    @Test @MainActor func selectionIsClampedAndResetsForNewQueries() {
+        let model = LauncherModel(defaults: isolatedDefaults(named: #function))
+        model.query = "applications"
+
+        model.moveSelection(by: 100)
+        #expect(model.selectedIndex == model.results.count - 1)
+
+        model.moveSelection(by: -100)
+        #expect(model.selectedIndex == 0)
+
+        model.moveSelection(by: 1)
+        #expect(model.selectedIndex == 1)
+
+        model.query = "settings"
+        #expect(model.selectedIndex == 0)
+        #expect(model.results.first?.id == LauncherModel.settingsResultID)
+    }
+
+    @Test @MainActor func runningSettingsDismissesLauncherAndOpensSettings() {
+        let model = LauncherModel(defaults: isolatedDefaults(named: #function))
+        var dismissalCount = 0
+        var settingsOpenCount = 0
+        model.onDismiss = { dismissalCount += 1 }
+        model.onOpenSettings = { settingsOpenCount += 1 }
+
+        model.runSelected()
+
+        #expect(dismissalCount == 1)
+        #expect(settingsOpenCount == 1)
+    }
+
+    @MainActor
+    private func isolatedDefaults(named name: String) -> UserDefaults {
+        let suiteName = "BeaconTests.\(name)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
     }
 }
