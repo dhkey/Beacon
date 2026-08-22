@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Xcode user data
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+
+# Xcode and Swift build products
+DerivedData/
+build/
+test-build/
+.build/
+*.hmap
+*.dSYM
+*.dSYM.zip
+*.xcarchive
+
+# Generated release files
+dist/
+dmg-root/
+
+# Playgrounds
+timeline.xctimeline
+playground.xcworkspace

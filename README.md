@@ -39,16 +39,16 @@ xcodebuild -project Beacon.xcodeproj -scheme Beacon -configuration Debug build
 
 ## Releases
 
-Every push and pull request to `main` is built and tested by GitHub Actions. Pushing a semantic version tag automatically creates a GitHub Release containing universal DMG, PKG, and ZIP packages.
+Every push and pull request to `master` is built and tested by GitHub Actions. Pushing a semantic version tag automatically creates a GitHub Release containing universal DMG, PKG, and ZIP packages.
 
 ### Create a release
 
-1. Commit the changes that should be included in the release and push them to `main`:
+1. Commit the changes that should be included in the release and push them to `master`:
 
    ```sh
    git add -A
    git commit -m "Prepare Beacon 1.0.1"
-   git push origin main
+   git push origin master
    ```
 
 2. Create an annotated tag on that commit and push it to GitHub:

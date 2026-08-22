@@ -30,11 +30,11 @@ xcodebuild -project Beacon.xcodeproj -scheme Beacon -configuration Debug build
 
 ## Making a change
 
-1. Fork the repository and create a focused branch from `main`:
+1. Fork the repository and create a focused branch from `master`:
 
    ```sh
-   git switch main
-   git pull --ff-only origin main
+   git switch master
+   git pull --ff-only origin master
    git switch -c fix/short-description
    ```
 
@@ -64,4 +64,4 @@ For user-interface changes, also verify the relevant behavior manually, includin
 - Keep each pull request focused on one concern.
 - Confirm that the project builds and tests pass locally.
 
-GitHub Actions builds and tests every pull request targeting `main`. A maintainer creates releases after changes are merged; contributors do not need to create release tags.
+GitHub Actions builds and tests every pull request targeting `master`. A maintainer creates releases after changes are merged; contributors do not need to create release tags.
