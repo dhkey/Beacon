@@ -2,7 +2,7 @@
 
 Beacon is a fast, native application launcher for macOS. Open it from anywhere with a global keyboard shortcut, search installed apps and common destinations, then press Return to launch the selected result.
 
-<img width="766" height="546" alt="зображення" src="https://github.com/user-attachments/assets/927ac562-e2db-44f8-a15a-93343c2c1a11" />
+<img width="766" height="546" alt="image" src="https://github.com/user-attachments/assets/927ac562-e2db-44f8-a15a-93343c2c1a11" />
 
 
 ## Features
