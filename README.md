@@ -39,14 +39,20 @@ xcodebuild -project Beacon.xcodeproj -scheme Beacon -configuration Debug build
 
 ## Releases
 
-Every push and pull request to `main` is built and tested by GitHub Actions. Pushing a semantic version tag automatically creates a GitHub Release containing a universal macOS application and its SHA-256 checksum:
+Every push and pull request to `main` is built and tested by GitHub Actions. Pushing a semantic version tag automatically creates a GitHub Release containing universal DMG, PKG, and ZIP packages with SHA-256 checksums:
 
 ```sh
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.0.1
+git push origin v1.0.1
 ```
 
-The release is ad-hoc signed because the project does not use a paid Apple Developer account. After downloading and unzipping Beacon, Control-click **Beacon.app**, choose **Open**, and confirm the macOS security prompt. Developer ID signing and notarization can be added later without changing the release process.
+## Install a release
+
+1. Download the DMG from the [latest GitHub Release](https://github.com/dhkey/Beacon/releases/latest).
+2. Open the DMG and drag **Beacon** into the **Applications** folder.
+3. In Applications, Control-click **Beacon**, choose **Open**, and confirm the macOS security prompt.
+
+The PKG provides a guided installer, while the ZIP contains the standalone application. The packages are ad-hoc signed because the project does not use a paid Apple Developer account, so the first-launch security confirmation is unavoidable. Developer ID signing and notarization can be added later without changing the release process.
 
 ## Usage
 

@@ -69,28 +69,50 @@ jobs:
           lipo -archs "${app}/Contents/MacOS/Beacon" | grep -q arm64
           lipo -archs "${app}/Contents/MacOS/Beacon" | grep -q x86_64
 
-      - name: Package application and checksum
+      - name: Create ZIP, DMG, PKG, and checksums
         run: |
           set -euo pipefail
           mkdir -p dist
 
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            archive="Beacon-${GITHUB_REF_NAME}.zip"
+            package_name="Beacon-${GITHUB_REF_NAME}"
           else
-            archive="Beacon-build-${GITHUB_RUN_NUMBER}.zip"
+            package_name="Beacon-build-${GITHUB_RUN_NUMBER}"
           fi
 
+          app="build/Build/Products/Release/Beacon.app"
+
           ditto -c -k --sequesterRsrc --keepParent \
-            "build/Build/Products/Release/Beacon.app" \
-            "dist/${archive}"
+            "${app}" \
+            "dist/${package_name}.zip"
+
+          mkdir -p dmg-root
+          ditto "${app}" "dmg-root/Beacon.app"
+          ln -s /Applications "dmg-root/Applications"
+          hdiutil create \
+            -volname "Beacon" \
+            -srcfolder "dmg-root" \
+            -ov \
+            -format UDZO \
+            "dist/${package_name}.dmg"
+
+          pkgbuild \
+            --component "${app}" \
+            --install-location "/Applications" \
+            "dist/${package_name}.pkg"
+
           cd dist
-          shasum -a 256 "${archive}" > "${archive}.sha256"
+          for package in "${package_name}.zip" "${package_name}.dmg" "${package_name}.pkg"; do
+            shasum -a 256 "${package}" > "${package}.sha256"
+          done
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
           name: Beacon-build
           path: |
+            dist/*.dmg
+            dist/*.pkg
             dist/*.zip
             dist/*.sha256
           if-no-files-found: error
@@ -118,6 +140,8 @@ jobs:
         run: |
           set -euo pipefail
           gh release create "${GITHUB_REF_NAME}" \
+            dist/*.dmg \
+            dist/*.pkg \
             dist/*.zip \
             dist/*.sha256 \
             --verify-tag \
