@@ -5,28 +5,66 @@
 //  Created by Denys Yazan on 22.08.2026.
 //
 
+import AppKit
 import SwiftUI
-import SwiftData
 
 @main
 struct BeaconApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        MenuBarExtra("Beacon", systemImage: "sparkle.magnifyingglass") {
+            Button("Open Beacon") {
+                appDelegate.showLauncher()
+            }
+            .keyboardShortcut(" ", modifiers: [.command])
+
+            SettingsLink {
+                Text("Settings…")
+            }
         }
-        .modelContainer(sharedModelContainer)
+
+        Settings {
+            SettingsView(model: appDelegate.model)
+        }
+    }
+}
+
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    let model = LauncherModel()
+
+    private var panelController: LauncherPanelController?
+    private let hotKeyManager = GlobalHotKeyManager()
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+
+        panelController = LauncherPanelController(model: model)
+        model.onDismiss = { [weak self] in
+            self?.panelController?.hide()
+        }
+        hotKeyManager.onPressed = { [weak self] in
+            self?.showLauncher()
+        }
+        applyShortcut(model.shortcut)
+        model.onShortcutChanged = { [weak self] shortcut in
+            self?.applyShortcut(shortcut)
+        }
+
+        model.loadApplications()
+        showLauncher()
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
+    func showLauncher() {
+        panelController?.toggle()
+    }
+
+    private func applyShortcut(_ shortcut: KeyboardShortcut) {
+        model.shortcutRegistrationError = hotKeyManager.register(shortcut: shortcut)
     }
 }

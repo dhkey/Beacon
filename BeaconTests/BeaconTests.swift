@@ -10,8 +10,25 @@ import Testing
 
 struct BeaconTests {
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
+    @Test func normalizationIgnoresCaseWhitespaceAndDiacritics() {
+        #expect(LauncherModel.normalized("  ČalCulator  ") == "calculator")
+    }
+
+    @Test func matchScoreRanksExactAndPrefixMatchesFirst() {
+        let exact = LauncherModel.matchScore(query: "notes", candidate: "notes")
+        let prefix = LauncherModel.matchScore(query: "notes", candidate: "notes application")
+        let contains = LauncherModel.matchScore(query: "notes", candidate: "open notes application")
+
+        #expect(exact != nil)
+        #expect(prefix != nil)
+        #expect(contains != nil)
+        #expect(exact! > prefix!)
+        #expect(prefix! > contains!)
+    }
+
+    @Test func fuzzyMatchAcceptsOrderedCharactersOnly() {
+        #expect(LauncherModel.matchScore(query: "sset", candidate: "system settings") != nil)
+        #expect(LauncherModel.matchScore(query: "zzz", candidate: "system settings") == nil)
     }
 
 }
