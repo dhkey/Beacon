@@ -78,7 +78,7 @@ struct SettingsView: View {
                 .foregroundStyle(Color.beaconMuted)
                 .padding(24)
         }
-        .frame(width: 560, height: 430)
+        .frame(width: 720, height: 500)
         .background(Color.beaconCanvas)
         .preferredColorScheme(.light)
     }
@@ -128,6 +128,11 @@ private final class ShortcutRecorderView: NSView {
     var shortcut = KeyboardShortcut.default
     var onChange: ((KeyboardShortcut) -> Void)?
     private var isRecording = false
+    private var doubleModifierDetectors = Dictionary(
+        uniqueKeysWithValues: KeyboardShortcut.DoubleTapModifier.allCases.map {
+            ($0, DoubleModifierPressDetector())
+        }
+    )
 
     override var acceptsFirstResponder: Bool { true }
     override var isFlipped: Bool { true }
@@ -135,13 +140,48 @@ private final class ShortcutRecorderView: NSView {
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
         isRecording = true
+        resetDoubleModifierDetectors()
         needsDisplay = true
     }
 
     override func resignFirstResponder() -> Bool {
         isRecording = false
+        resetDoubleModifierDetectors()
         needsDisplay = true
         return super.resignFirstResponder()
+    }
+
+    override func flagsChanged(with event: NSEvent) {
+        guard isRecording else {
+            super.flagsChanged(with: event)
+            return
+        }
+
+        let deviceFlags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let relevantModifiers: NSEvent.ModifierFlags = [.command, .option, .control, .shift, .function]
+        var detectedModifier: KeyboardShortcut.DoubleTapModifier?
+
+        for modifier in KeyboardShortcut.DoubleTapModifier.allCases {
+            var detector = doubleModifierDetectors[modifier] ?? DoubleModifierPressDetector()
+            var otherModifiers = deviceFlags.intersection(relevantModifiers)
+            otherModifiers.remove(modifier.eventFlag)
+            if detector.flagsChanged(
+                modifierIsPressed: deviceFlags.contains(modifier.eventFlag),
+                hasOtherModifiers: !otherModifiers.isEmpty,
+                timestamp: event.timestamp
+            ) {
+                detectedModifier = modifier
+            }
+            doubleModifierDetectors[modifier] = detector
+        }
+        guard let detectedModifier else { return }
+
+        let newShortcut = KeyboardShortcut.doubleTap(detectedModifier)
+        shortcut = newShortcut
+        isRecording = false
+        onChange?(newShortcut)
+        window?.makeFirstResponder(nil)
+        needsDisplay = true
     }
 
     override func keyDown(with event: NSEvent) {
@@ -152,6 +192,7 @@ private final class ShortcutRecorderView: NSView {
             return
         }
 
+        resetDoubleModifierDetectors()
         let newShortcut = KeyboardShortcut(event: event)
         guard newShortcut.modifiers != 0 else {
             NSSound.beep()
@@ -174,7 +215,7 @@ private final class ShortcutRecorderView: NSView {
         path.lineWidth = isRecording ? 1.5 : 1
         path.stroke()
 
-        let text = isRecording ? "Press a shortcut…" : shortcut.displayName
+        let text = isRecording ? "Press keys or double-tap a modifier…" : shortcut.displayName
         let style = NSMutableParagraphStyle()
         style.alignment = .center
         let attributes: [NSAttributedString.Key: Any] = [
@@ -191,6 +232,14 @@ private final class ShortcutRecorderView: NSView {
 
     override func resetCursorRects() {
         addCursorRect(bounds, cursor: .pointingHand)
+    }
+
+    private func resetDoubleModifierDetectors() {
+        for modifier in KeyboardShortcut.DoubleTapModifier.allCases {
+            var detector = doubleModifierDetectors[modifier] ?? DoubleModifierPressDetector()
+            detector.reset()
+            doubleModifierDetectors[modifier] = detector
+        }
     }
 }
 

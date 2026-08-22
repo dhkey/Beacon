@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.openSettings) private var openSettings
     @Bindable var model: LauncherModel
     @FocusState private var searchFocused: Bool
 
@@ -52,10 +53,8 @@ struct ContentView: View {
                 .font(.system(size: 22, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.beaconInk)
                 .focused($searchFocused)
-                .onSubmit { model.runSelected() }
+                .onSubmit { runCurrentSelection() }
                 .accessibilityIdentifier("launcherSearchField")
-
-            ShortcutBadge(shortcut: model.shortcut)
         }
         .padding(.horizontal, 22)
         .frame(height: 72)
@@ -166,6 +165,15 @@ struct ContentView: View {
         try? await Task.sleep(for: .milliseconds(80))
         searchFocused = true
     }
+
+    private func runCurrentSelection() {
+        if model.query.isEmpty {
+            model.dismiss()
+            openSettings()
+        } else {
+            model.runSelected()
+        }
+    }
 }
 
 private struct ResultRow: View {
@@ -236,27 +244,6 @@ private struct ResultIcon: View {
         .frame(width: 38, height: 38)
         .background(result.icon == nil ? result.tint : .clear)
         .clipShape(RoundedRectangle(cornerRadius: 9))
-    }
-}
-
-struct ShortcutBadge: View {
-    let shortcut: KeyboardShortcut
-
-    var body: some View {
-        HStack(spacing: 3) {
-            ForEach(shortcut.keyCapComponents, id: \.self) { key in
-                Text(key)
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Color.beaconMuted)
-                    .frame(minWidth: 22, minHeight: 22)
-                    .background(Color.white.opacity(0.7))
-                    .clipShape(RoundedRectangle(cornerRadius: 5))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 5)
-                            .stroke(Color.black.opacity(0.07), lineWidth: 1)
-                    }
-            }
-        }
     }
 }
 

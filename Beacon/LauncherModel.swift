@@ -51,7 +51,10 @@ struct LauncherResult: Identifiable, Hashable {
 @Observable
 final class LauncherModel {
     var query = "" {
-        didSet { rebuildResults() }
+        didSet {
+            selectedIndex = 0
+            rebuildResults()
+        }
     }
     var results: [LauncherResult] = []
     var selectedIndex = 0
@@ -63,6 +66,7 @@ final class LauncherModel {
 
     var shortcut: KeyboardShortcut {
         didSet {
+            defaults.set(shortcut.kind.rawValue, forKey: Keys.shortcutKind)
             defaults.set(Int(shortcut.keyCode), forKey: Keys.keyCode)
             defaults.set(Int(shortcut.modifiers), forKey: Keys.modifiers)
             onShortcutChanged?(shortcut)
@@ -76,6 +80,7 @@ final class LauncherModel {
         self.defaults = defaults
         if defaults.object(forKey: Keys.keyCode) != nil {
             shortcut = KeyboardShortcut(
+                kind: KeyboardShortcut.Kind(rawValue: defaults.integer(forKey: Keys.shortcutKind)) ?? .keyCombination,
                 keyCode: UInt32(defaults.integer(forKey: Keys.keyCode)),
                 modifiers: UInt32(defaults.integer(forKey: Keys.modifiers))
             )
@@ -185,26 +190,7 @@ final class LauncherModel {
     }
 
     private func commandResults() -> [LauncherResult] {
-        let home = FileManager.default.homeDirectoryForCurrentUser
         return [
-            LauncherResult(
-                id: "command:system-settings",
-                title: "System Settings",
-                subtitle: "Open macOS settings",
-                symbolName: "switch.2",
-                tint: Color(red: 0.90, green: 0.92, blue: 0.95),
-                icon: nil,
-                target: .url(URL(string: "x-apple.systempreferences:")!)
-            ),
-            LauncherResult(
-                id: "command:downloads",
-                title: "Downloads",
-                subtitle: "Open folder in Finder",
-                symbolName: "arrow.down.circle.fill",
-                tint: Color(red: 0.91, green: 0.94, blue: 0.89),
-                icon: nil,
-                target: .url(home.appending(path: "Downloads"))
-            ),
             LauncherResult(
                 id: "command:applications",
                 title: "Applications",
@@ -279,6 +265,7 @@ final class LauncherModel {
     }
 
     private enum Keys {
+        static let shortcutKind = "launcherShortcutKind"
         static let keyCode = "launcherShortcutKeyCode"
         static let modifiers = "launcherShortcutModifiers"
     }
@@ -289,20 +276,11 @@ extension LauncherModel {
         let model = LauncherModel(defaults: UserDefaults(suiteName: "BeaconPreview")!)
         model.results = [
             LauncherResult(
-                id: "preview:settings",
-                title: "System Settings",
-                subtitle: "Open macOS settings",
-                symbolName: "switch.2",
-                tint: Color(red: 0.90, green: 0.92, blue: 0.95),
-                icon: nil,
-                target: .url(URL(string: "x-apple.systempreferences:")!)
-            ),
-            LauncherResult(
-                id: "preview:downloads",
-                title: "Downloads",
+                id: "preview:applications",
+                title: "Applications",
                 subtitle: "Open folder in Finder",
-                symbolName: "arrow.down.circle.fill",
-                tint: Color(red: 0.91, green: 0.94, blue: 0.89),
+                symbolName: "square.grid.2x2.fill",
+                tint: Color(red: 0.95, green: 0.92, blue: 0.88),
                 icon: nil,
                 target: .url(URL(filePath: "/Applications"))
             )

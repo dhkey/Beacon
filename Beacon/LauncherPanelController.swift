@@ -14,13 +14,14 @@ final class LauncherPanelController: NSWindowController, NSWindowDelegate {
 
         let panel = BeaconPanel(
             contentRect: NSRect(x: 0, y: 0, width: 720, height: 500),
-            styleMask: [.borderless, .fullSizeContentView],
+            styleMask: [.borderless, .fullSizeContentView, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
         panel.level = .floating
         panel.isFloatingPanel = true
-        panel.hidesOnDeactivate = true
+        panel.hidesOnDeactivate = false
+        panel.becomesKeyOnlyIfNeeded = false
         panel.isMovableByWindowBackground = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         panel.backgroundColor = .clear
@@ -44,7 +45,7 @@ final class LauncherPanelController: NSWindowController, NSWindowDelegate {
     }
 
     func toggle() {
-        if window?.isVisible == true && NSApp.isActive {
+        if window?.isVisible == true {
             hide()
         } else {
             show()
@@ -58,7 +59,6 @@ final class LauncherPanelController: NSWindowController, NSWindowDelegate {
         if !panel.isVisible {
             panel.center()
         }
-        NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
         NotificationCenter.default.post(name: .beaconDidShow, object: nil)
     }

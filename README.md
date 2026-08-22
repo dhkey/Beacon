@@ -5,10 +5,10 @@ Beacon is a fast, native application launcher for macOS. Open it from anywhere w
 ## Features
 
 - Native SwiftUI and AppKit interface
-- Global launcher shortcut (`⌥ Space` by default)
+- Global launcher shortcut (`⌥ Space` by default), including double-tap modifier support
 - Search across system and user Applications folders
 - Case-insensitive, diacritic-insensitive fuzzy matching
-- Quick access to System Settings, Downloads, and Applications
+- Quick access to Applications
 - Web search fallback in the default browser
 - Keyboard navigation with the arrow keys and Return
 - Configurable shortcut and manual application reindexing

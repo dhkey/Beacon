@@ -18,10 +18,14 @@ struct BeaconApp: App {
                 appDelegate.showLauncher()
             }
             .keyboardShortcut(" ", modifiers: [.command])
-
+            Divider()
             SettingsLink {
                 Text("Settings…")
             }
+            Button("Quit") {
+                NSApp.terminate(nil)
+            }
+            .keyboardShortcut("q", modifiers: [.command])
         }
 
         Settings {
@@ -36,8 +40,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var panelController: LauncherPanelController?
     private let hotKeyManager = GlobalHotKeyManager()
+    private var isDuplicateInstance = false
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
+        let currentProcessIdentifier = ProcessInfo.processInfo.processIdentifier
+        isDuplicateInstance = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
+            .contains { $0.processIdentifier != currentProcessIdentifier }
+        if isDuplicateInstance { NSApp.terminate(nil) }
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard !isDuplicateInstance else { return }
         NSApp.setActivationPolicy(.accessory)
 
         panelController = LauncherPanelController(model: model)
@@ -58,6 +72,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        guard model.shortcut.doubleTapModifier != nil,
+              model.shortcutRegistrationError != nil else { return }
+        applyShortcut(model.shortcut)
     }
 
     func showLauncher() {
