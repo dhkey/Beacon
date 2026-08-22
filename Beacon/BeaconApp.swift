@@ -38,7 +38,10 @@ struct BeaconApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = LauncherModel()
 
+    private static let applicationIndexCheckInterval: TimeInterval = 24 * 60 * 60
+
     private var panelController: LauncherPanelController?
+    private var applicationIndexTimer: Timer?
     private let hotKeyManager = GlobalHotKeyManager()
     private var isDuplicateInstance = false
 
@@ -67,6 +70,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         model.loadApplications()
+        applicationIndexTimer = Timer.scheduledTimer(
+            withTimeInterval: Self.applicationIndexCheckInterval,
+            repeats: true
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.model.checkForNewApplications()
+            }
+        }
         showLauncher()
     }
 

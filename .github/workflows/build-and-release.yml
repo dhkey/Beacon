@@ -64,6 +64,17 @@ jobs:
         run: |
           set -euo pipefail
           app="build/Build/Products/Release/Beacon.app"
+
+          expected_version="0.0.0"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            expected_version="${GITHUB_REF_NAME#v}"
+          fi
+          app_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${app}/Contents/Info.plist")"
+          if [[ "${app_version}" != "${expected_version}" ]]; then
+            echo "App version ${app_version} does not match expected version ${expected_version}" >&2
+            exit 1
+          fi
+
           codesign --force --deep --options runtime --sign - "${app}"
           codesign --verify --deep --strict --verbose=2 "${app}"
           lipo -archs "${app}/Contents/MacOS/Beacon" | grep -q arm64

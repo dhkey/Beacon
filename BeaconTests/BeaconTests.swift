@@ -31,6 +31,17 @@ struct BeaconTests {
         #expect(LauncherModel.matchScore(query: "sset", candidate: "system settings") != nil)
         #expect(LauncherModel.matchScore(query: "zzz", candidate: "system settings") == nil)
     }
+
+    @Test func applicationIndexDetectsNewPathsOnly() {
+        let calculator = URL(filePath: "/Applications/Calculator.app")
+        let notes = URL(filePath: "/Applications/Notes.app")
+        let indexedPaths = Set([calculator.standardizedFileURL.path])
+
+        #expect(!LauncherModel.containsNewApplication(in: [calculator], indexedPaths: indexedPaths))
+        #expect(LauncherModel.containsNewApplication(in: [calculator, notes], indexedPaths: indexedPaths))
+        #expect(!LauncherModel.containsNewApplication(in: [], indexedPaths: indexedPaths))
+    }
+
     @Test @MainActor func doubleModifierRequiresTwoQuickPresses() {
         var detector = DoubleModifierPressDetector()
 

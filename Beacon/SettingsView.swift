@@ -56,24 +56,12 @@ struct SettingsView: View {
                         .background(Color(red: 0.98, green: 0.92, blue: 0.91))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-
-                Divider().opacity(0.65)
-
-                settingSection(
-                    title: "Application index",
-                    detail: "Beacon searches apps installed in the system and user Applications folders."
-                ) {
-                    Button("Reindex applications") {
-                        model.loadApplications()
-                    }
-                    .disabled(model.isIndexing)
-                }
             }
             .padding(24)
 
             Spacer(minLength: 0)
 
-            Text("Beacon 1.0 · Native for macOS")
+            Text("Beacon \(appVersion)")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Color.beaconMuted)
                 .padding(24)
@@ -81,6 +69,10 @@ struct SettingsView: View {
         .frame(width: 720, height: 500)
         .background(Color.beaconCanvas)
         .preferredColorScheme(.light)
+    }
+
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
     }
 
     private func settingSection<Content: View>(

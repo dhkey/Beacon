@@ -96,16 +96,27 @@ final class LauncherModel {
     }
 
     func loadApplications() {
+        updateApplications(onlyWhenNew: false)
+    }
+
+    func checkForNewApplications() {
+        updateApplications(onlyWhenNew: true)
+    }
+
+    private func updateApplications(onlyWhenNew: Bool) {
         guard !isIndexing else { return }
         isIndexing = true
+        let indexedPaths = Set(applications.map(\.id))
 
         Task {
             let urls = await Task.detached(priority: .utility) {
                 Self.discoverApplicationURLs()
             }.value
-            applications = urls.map(IndexedApplication.init)
+            if !onlyWhenNew || Self.containsNewApplication(in: urls, indexedPaths: indexedPaths) {
+                applications = urls.map(IndexedApplication.init)
+                rebuildResults()
+            }
             isIndexing = false
-            rebuildResults()
         }
     }
 
@@ -228,6 +239,10 @@ final class LauncherModel {
             }
         }
         return queryIndex == query.endIndex ? score : nil
+    }
+
+    nonisolated static func containsNewApplication(in urls: [URL], indexedPaths: Set<String>) -> Bool {
+        urls.contains { !indexedPaths.contains($0.standardizedFileURL.path) }
     }
 
     nonisolated private static func discoverApplicationURLs() -> [URL] {
