@@ -55,7 +55,9 @@ struct ContentView: View {
             return .handled
         }
         .onKeyPress(.return) {
-            guard model.isSettingsButtonSelected else { return .ignored }
+            guard model.isSettingsButtonSelected || LauncherModel.normalized(model.query).isEmpty else {
+                return .ignored
+            }
             model.runSelected()
             return .handled
         }

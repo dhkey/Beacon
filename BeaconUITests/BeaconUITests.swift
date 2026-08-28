@@ -74,6 +74,22 @@ final class BeaconUITests: XCTestCase {
     }
 
     @MainActor
+    func testReturnOpensSelectedFavorite() throws {
+        let app = application(favoriteIDs: ["command:settings"])
+        app.launch()
+
+        let searchField = app.textFields["launcherSearchField"]
+        let settingsResult = app.buttons["openBeaconSettingsResult"]
+        XCTAssertTrue(searchField.waitForExistence(timeout: 2))
+        XCTAssertTrue(settingsResult.waitForExistence(timeout: 2))
+        XCTAssertTrue(settingsResult.isSelected)
+
+        searchField.typeKey(.return, modifierFlags: [])
+
+        XCTAssertTrue(app.otherElements["settingsView"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
     func testOptionDownArrowReordersSelectedFavorite() throws {
         let app = application(favoriteIDs: ["command:settings", "command:applications"])
         app.launch()
