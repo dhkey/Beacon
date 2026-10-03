@@ -2,6 +2,8 @@
 
 This file contains repository-specific guidance for coding agents working on Beacon.
 
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) as well. It is the source of truth for branch names, commit messages, scopes, pull request titles, and the test commands, and it applies to agents exactly as it applies to human contributors.
+
 ## Project overview
 
 Beacon is a native macOS application launcher written in Swift with SwiftUI and AppKit. It runs as a menu-bar accessory, presents a floating launcher panel, indexes local applications, registers a global keyboard shortcut, and opens the selected application or destination.
@@ -29,6 +31,7 @@ The project intentionally has no third-party dependencies.
 ## Working rules
 
 - Read the relevant implementation and tests before changing behavior.
+- Name branches, commits, and pull requests as `CONTRIBUTING.md` specifies: `feat/theme-settings`, `feat(settings): add theme setting with light and dark appearances`.
 - Keep changes focused and preserve unrelated user modifications in the worktree.
 - Follow the style of the surrounding Swift code; do not add a new architecture, package, or dependency unless the task requires it.
 - Keep UI-bound mutable state and AppKit interactions on `@MainActor`.
