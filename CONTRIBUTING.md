@@ -45,9 +45,9 @@ xcodebuild -project Beacon.xcodeproj -scheme Beacon -configuration Debug build
 
 ## Branch and commit naming
 
-Use a short, lowercase, kebab-case branch name with a category prefix:
+Use a short, lowercase, kebab-case branch name prefixed with the commit type the work belongs to:
 
-- `feature/global-shortcut-presets`
+- `feat/global-shortcut-presets`
 - `fix/search-selection-reset`
 - `docs/release-instructions`
 - `refactor/application-indexing`
@@ -72,6 +72,19 @@ Use one of these commit types:
 - `build`: build system or dependency changes
 - `ci`: continuous-integration changes
 - `chore`: repository maintenance not covered above
+
+Use the scope to name the area of Beacon that changed. Prefer one of the established scopes:
+
+- `launcher`: the floating panel, its presentation, and dismissal
+- `search`: indexing, normalization, matching, and ranking
+- `favorites`: favorite selection, ordering, and persistence
+- `shortcuts`: the global shortcut and keyboard navigation
+- `settings`: the settings window and stored preferences
+- `theme`: appearance and styling
+- `assets`: icons and asset catalog contents
+- `release`: packaging and release workflow
+
+Omit the scope when a change is genuinely repository-wide, and add a new scope only when no existing one fits.
 
 Examples:
 
@@ -101,7 +114,26 @@ For user-interface changes, also verify the relevant behavior manually, includin
 
 ## Pull requests
 
-- Give the pull request a clear title and explain what changed and why.
+### Title
+
+Title every pull request in the same Conventional Commits format used for commits, including the scope whenever the change belongs to one area:
+
+```text
+type(scope): short imperative summary
+```
+
+```text
+feat(settings): add theme setting with light and dark appearances
+fix(favorites): open the selected favorite instead of the first result
+refactor(search): extract application discovery from LauncherModel
+docs: document the pull request title convention
+```
+
+The title is the squash-merge commit message, so it must stand on its own in the `master` history. Keep it under roughly 72 characters, start the summary with a lowercase imperative verb, and do not end it with a period. Do not prefix the title with an issue number, a branch name, or `WIP`; mark work in progress by opening the pull request as a draft instead.
+
+### Description
+
+- Explain what changed and why.
 - Link any related issue.
 - Include screenshots or a short recording for visible interface changes.
 - Keep each pull request focused on one concern.
