@@ -62,6 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !isDuplicateInstance else { return }
         NSApp.setActivationPolicy(.accessory)
+        NSWindow.allowsAutomaticWindowTabbing = false
 
         panelController = LauncherPanelController(model: model)
         model.onDismiss = { [weak self] in

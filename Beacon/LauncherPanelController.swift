@@ -55,6 +55,7 @@ final class LauncherPanelController: NSWindowController, NSWindowDelegate {
     func show() {
         guard let panel = window else { return }
         model.prepareForPresentation()
+        panel.appearance = model.theme.appearance
 
         if !panel.isVisible {
             panel.center()
