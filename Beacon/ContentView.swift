@@ -14,6 +14,10 @@ struct ContentView: View {
     @FocusState private var searchFocused: Bool
     @State private var lastPointerLocation: NSPoint?
 
+    private var scheme: ColorScheme {
+        model.resolvedColorScheme
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             searchBar
@@ -23,8 +27,8 @@ struct ContentView: View {
             footer
         }
         .frame(width: 720, height: 500)
-        .background(Color.beaconCanvas)
-        .preferredColorScheme(.light)
+        .background(Color.beaconCanvas(scheme))
+        .animation(.easeInOut(duration: 0.25), value: scheme)
         .task {
             model.onOpenSettings = {
                 NSApp.activate(ignoringOtherApps: true)
@@ -74,12 +78,12 @@ struct ContentView: View {
         HStack(spacing: 14) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Color.beaconInk)
+                .foregroundStyle(Color.beaconInk(scheme))
 
             TextField("Search apps and commands", text: $model.query)
                 .textFieldStyle(.plain)
                 .font(.system(size: 22, weight: .medium, design: .rounded))
-                .foregroundStyle(Color.beaconInk)
+                .foregroundStyle(Color.beaconInk(scheme))
                 .focused($searchFocused)
                 .onSubmit { runCurrentSelection() }
                 .accessibilityIdentifier("launcherSearchField")
@@ -94,15 +98,15 @@ struct ContentView: View {
             VStack(spacing: 10) {
                 Image(systemName: emptyStateSymbol)
                     .font(.system(size: 26, weight: .medium))
-                    .foregroundStyle(Color.beaconMuted)
+                    .foregroundStyle(Color.beaconMuted(scheme))
                     .symbolEffect(.rotate, isActive: model.isIndexing)
                 Text(emptyStateTitle)
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Color.beaconMuted)
+                    .foregroundStyle(Color.beaconMuted(scheme))
                 if model.query.isEmpty && !model.isIndexing {
                     Text("Search for an app or command, then press ⌘K")
                         .font(.system(size: 12))
-                        .foregroundStyle(Color.beaconMuted)
+                        .foregroundStyle(Color.beaconMuted(scheme))
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -115,6 +119,7 @@ struct ContentView: View {
                                 result: result,
                                 isSelected: !model.isSettingsButtonSelected && index == model.selectedIndex,
                                 isFavorite: model.isFavorite(result),
+                                scheme: scheme,
                                 onPointerMove: { updateSelectionFromPointer(to: index) },
                                 onRun: {
                                     model.selectResult(at: index)
@@ -154,7 +159,7 @@ struct ContentView: View {
                 Label("Settings", systemImage: "gearshape")
                     .padding(.horizontal, 8)
                     .frame(height: 26)
-                    .background(model.isSettingsButtonSelected ? Color.beaconSelection : .clear)
+                    .background(model.isSettingsButtonSelected ? Color.beaconSelection(scheme) : .clear)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             }
             .buttonStyle(.plain)
@@ -162,7 +167,7 @@ struct ContentView: View {
             .accessibilityAddTraits(model.isSettingsButtonSelected ? .isSelected : [])
         }
         .font(.system(size: 11, weight: .medium))
-        .foregroundStyle(Color.beaconMuted)
+        .foregroundStyle(Color.beaconMuted(scheme))
         .padding(.horizontal, 18)
         .frame(height: 38)
     }
@@ -198,22 +203,23 @@ private struct ResultRow: View {
     let result: LauncherResult
     let isSelected: Bool
     let isFavorite: Bool
+    let scheme: ColorScheme
     let onPointerMove: () -> Void
     let onRun: () -> Void
 
     var body: some View {
         Button(action: onRun) {
             HStack(spacing: 13) {
-                ResultIcon(result: result)
+                ResultIcon(result: result, scheme: scheme)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(result.title)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.beaconInk)
+                        .foregroundStyle(Color.beaconInk(scheme))
                         .lineLimit(1)
                     Text(result.subtitle)
                         .font(.system(size: 12, weight: .regular))
-                        .foregroundStyle(Color.beaconMuted)
+                        .foregroundStyle(Color.beaconMuted(scheme))
                         .lineLimit(1)
                 }
 
@@ -222,28 +228,28 @@ private struct ResultRow: View {
                 if isFavorite {
                     Image(systemName: "star.fill")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.beaconMuted)
+                        .foregroundStyle(Color.beaconMuted(scheme))
                         .accessibilityLabel("Favorite")
                 }
 
                 if isSelected {
                     Text("↵")
                         .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Color.beaconMuted)
+                        .foregroundStyle(Color.beaconMuted(scheme))
                         .padding(.horizontal, 8)
                         .frame(height: 24)
-                        .background(Color.white.opacity(0.78))
+                        .background(Color.beaconKeycapBackground(scheme))
                         .clipShape(RoundedRectangle(cornerRadius: 5))
                         .overlay {
                             RoundedRectangle(cornerRadius: 5)
-                                .stroke(Color.black.opacity(0.07), lineWidth: 1)
+                                .stroke(Color.beaconKeycapBorder(scheme), lineWidth: 1)
                         }
                 }
             }
             .padding(.horizontal, 12)
             .frame(height: 58)
             .contentShape(Rectangle())
-            .background(isSelected ? Color.beaconSelection : .clear)
+            .background(isSelected ? Color.beaconSelection(scheme) : .clear)
             .clipShape(RoundedRectangle(cornerRadius: 9))
         }
         .buttonStyle(.plain)
@@ -258,6 +264,7 @@ private struct ResultRow: View {
 
 private struct ResultIcon: View {
     let result: LauncherResult
+    let scheme: ColorScheme
 
     var body: some View {
         Group {
@@ -269,20 +276,76 @@ private struct ResultIcon: View {
             } else {
                 Image(systemName: result.symbolName)
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color.beaconInk)
+                    .foregroundStyle(Color.beaconInk(scheme))
             }
         }
         .frame(width: 38, height: 38)
-        .background(result.icon == nil ? result.tint : .clear)
+        .background(result.icon == nil ? Color.beaconTint(result.tint, scheme) : .clear)
         .clipShape(RoundedRectangle(cornerRadius: 9))
     }
 }
 
+extension NSColor {
+    static func beaconDynamic(light: NSColor, dark: NSColor) -> NSColor {
+        NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
+        }
+    }
+}
+
 extension Color {
-    static let beaconCanvas = Color(red: 0.973, green: 0.969, blue: 0.953)
-    static let beaconInk = Color(red: 0.10, green: 0.10, blue: 0.095)
-    static let beaconMuted = Color(red: 0.43, green: 0.42, blue: 0.39)
-    static let beaconSelection = Color(red: 0.91, green: 0.925, blue: 0.90)
+    static func beaconCanvas(_ scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.102, green: 0.102, blue: 0.110)
+            : Color(red: 0.973, green: 0.969, blue: 0.953)
+    }
+
+    static func beaconInk(_ scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.93, green: 0.93, blue: 0.95)
+            : Color(red: 0.10, green: 0.10, blue: 0.095)
+    }
+
+    static func beaconMuted(_ scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.62, green: 0.62, blue: 0.65)
+            : Color(red: 0.43, green: 0.42, blue: 0.39)
+    }
+
+    static func beaconSelection(_ scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.22, green: 0.22, blue: 0.24)
+            : Color(red: 0.91, green: 0.925, blue: 0.90)
+    }
+
+    static func beaconKeycapBackground(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.14) : Color.white.opacity(0.78)
+    }
+
+    static func beaconKeycapBorder(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.07)
+    }
+
+    static func beaconTint(_ token: BeaconTint, _ scheme: ColorScheme) -> Color {
+        switch token {
+        case .blue:
+            return scheme == .dark
+                ? Color(red: 0.20, green: 0.24, blue: 0.28)
+                : Color(red: 0.90, green: 0.93, blue: 0.96)
+        case .green:
+            return scheme == .dark
+                ? Color(red: 0.18, green: 0.26, blue: 0.23)
+                : Color(red: 0.90, green: 0.94, blue: 0.92)
+        case .clay:
+            return scheme == .dark
+                ? Color(red: 0.27, green: 0.24, blue: 0.21)
+                : Color(red: 0.94, green: 0.91, blue: 0.88)
+        case .sand:
+            return scheme == .dark
+                ? Color(red: 0.28, green: 0.25, blue: 0.20)
+                : Color(red: 0.95, green: 0.92, blue: 0.88)
+        }
+    }
 }
 
 #Preview {

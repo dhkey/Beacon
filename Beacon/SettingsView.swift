@@ -4,15 +4,19 @@ import SwiftUI
 struct SettingsView: View {
     @Bindable var model: LauncherModel
 
+    private var scheme: ColorScheme {
+        model.resolvedColorScheme
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 12) {
                     Image(systemName: "sparkle.magnifyingglass")
                         .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(Color.beaconInk)
+                        .foregroundStyle(Color.beaconInk(scheme))
                         .frame(width: 42, height: 42)
-                        .background(Color.beaconSelection)
+                        .background(Color.beaconSelection(scheme))
                         .clipShape(RoundedRectangle(cornerRadius: 10))
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -20,15 +24,38 @@ struct SettingsView: View {
                             .font(.system(size: 20, weight: .bold, design: .rounded))
                         Text("Launcher settings")
                             .font(.system(size: 12))
-                            .foregroundStyle(Color.beaconMuted)
+                            .foregroundStyle(Color.beaconMuted(scheme))
                     }
                 }
             }
-            .padding(24)
+            .padding(.horizontal, 24)
+            .padding(.top, 46)
+            .padding(.bottom, 24)
 
             Divider().opacity(0.65)
 
             VStack(alignment: .leading, spacing: 24) {
+                settingSection(
+                    title: "Appearance",
+                    detail: "Choose how Beacon looks, or follow the system setting."
+                ) {
+                    Picker("Theme", selection: Binding(
+                        get: { model.theme },
+                        set: { newTheme in
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                model.updateTheme(newTheme)
+                            }
+                        }
+                    )) {
+                        ForEach(AppTheme.allCases) { theme in
+                            Text(theme.displayName).tag(theme)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("themePicker")
+                }
+
                 settingSection(
                     title: "Open shortcut",
                     detail: "Use this shortcut anywhere in macOS to show or hide Beacon."
@@ -50,10 +77,10 @@ struct SettingsView: View {
                 if let error = model.shortcutRegistrationError {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Color(red: 0.57, green: 0.25, blue: 0.22))
+                        .foregroundStyle(Color.beaconErrorText(scheme))
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(red: 0.98, green: 0.92, blue: 0.91))
+                        .background(Color.beaconErrorBackground(scheme))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }
@@ -63,13 +90,13 @@ struct SettingsView: View {
 
             Text("Beacon \(appVersion)")
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Color.beaconMuted)
+                .foregroundStyle(Color.beaconMuted(scheme))
                 .padding(24)
         }
         .frame(width: 720, height: 500)
-        .background(Color.beaconCanvas)
-        .background(SettingsWindowFocusView())
-        .preferredColorScheme(.light)
+        .background(Color.beaconCanvas(scheme))
+        .background(SettingsWindowFocusView(appearance: model.theme.appearance))
+        .animation(.easeInOut(duration: 0.25), value: scheme)
         .accessibilityIdentifier("settingsView")
     }
 
@@ -86,10 +113,10 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.beaconInk)
+                    .foregroundStyle(Color.beaconInk(scheme))
                 Text(detail)
                     .font(.system(size: 12))
-                    .foregroundStyle(Color.beaconMuted)
+                    .foregroundStyle(Color.beaconMuted(scheme))
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -101,17 +128,34 @@ struct SettingsView: View {
 }
 
 private struct SettingsWindowFocusView: NSViewRepresentable {
+    let appearance: NSAppearance?
+
     func makeNSView(context: Context) -> SettingsWindowFocusingView {
-        SettingsWindowFocusingView()
+        let view = SettingsWindowFocusingView()
+        view.windowAppearance = appearance
+        return view
     }
 
-    func updateNSView(_ view: SettingsWindowFocusingView, context: Context) {}
+    func updateNSView(_ view: SettingsWindowFocusingView, context: Context) {
+        view.windowAppearance = appearance
+    }
 }
 
 private final class SettingsWindowFocusingView: NSView {
+    var windowAppearance: NSAppearance? {
+        didSet { window?.appearance = windowAppearance }
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        guard window != nil else { return }
+        guard let window else { return }
+
+        window.appearance = windowAppearance
+        window.tabbingMode = .disallowed
+        window.styleMask.insert(.fullSizeContentView)
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.isMovableByWindowBackground = true
 
         DispatchQueue.main.async { [weak self] in
             guard let window = self?.window else { return }
@@ -224,9 +268,15 @@ private final class ShortcutRecorderView: NSView {
         super.draw(dirtyRect)
 
         let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 7, yRadius: 7)
-        (isRecording ? NSColor.white : NSColor(calibratedWhite: 1, alpha: 0.62)).setFill()
+        let fillColor: NSColor = isRecording
+            ? NSColor.beaconDynamic(light: .white, dark: NSColor(white: 1, alpha: 0.18))
+            : NSColor.beaconDynamic(light: NSColor(white: 1, alpha: 0.62), dark: NSColor(white: 1, alpha: 0.08))
+        fillColor.setFill()
         path.fill()
-        (isRecording ? NSColor.controlAccentColor.withAlphaComponent(0.75) : NSColor.black.withAlphaComponent(0.10)).setStroke()
+        let strokeColor: NSColor = isRecording
+            ? NSColor.controlAccentColor.withAlphaComponent(0.75)
+            : NSColor.beaconDynamic(light: NSColor(white: 0, alpha: 0.10), dark: NSColor(white: 1, alpha: 0.14))
+        strokeColor.setStroke()
         path.lineWidth = isRecording ? 1.5 : 1
         path.stroke()
 
@@ -255,6 +305,20 @@ private final class ShortcutRecorderView: NSView {
             detector.reset()
             doubleModifierDetectors[modifier] = detector
         }
+    }
+}
+
+extension Color {
+    static func beaconErrorText(_ scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.95, green: 0.62, blue: 0.56)
+            : Color(red: 0.57, green: 0.25, blue: 0.22)
+    }
+
+    static func beaconErrorBackground(_ scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.30, green: 0.16, blue: 0.14)
+            : Color(red: 0.98, green: 0.92, blue: 0.91)
     }
 }
 

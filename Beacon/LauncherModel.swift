@@ -24,6 +24,45 @@ struct IndexedApplication: Identifiable, Hashable {
     }
 }
 
+enum AppTheme: Int, CaseIterable, Identifiable, Equatable {
+    case system
+    case light
+    case dark
+
+    var id: Int { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+
+    var appearance: NSAppearance? {
+        switch self {
+        case .system: return nil
+        case .light: return NSAppearance(named: .aqua)
+        case .dark: return NSAppearance(named: .darkAqua)
+        }
+    }
+}
+
+enum BeaconTint {
+    case blue
+    case green
+    case clay
+    case sand
+}
+
 enum LauncherTarget: Hashable {
     case application(URL)
     case settings
@@ -35,7 +74,7 @@ struct LauncherResult: Identifiable, Hashable {
     let title: String
     let subtitle: String
     let symbolName: String
-    let tint: Color
+    let tint: BeaconTint
     let icon: NSImage?
     let target: LauncherTarget
 
@@ -86,7 +125,20 @@ final class LauncherModel {
         }
     }
 
+    var theme: AppTheme {
+        didSet {
+            defaults.set(theme.rawValue, forKey: Keys.theme)
+        }
+    }
+
+    private(set) var systemColorScheme: ColorScheme = .light
+
+    var resolvedColorScheme: ColorScheme {
+        theme.colorScheme ?? systemColorScheme
+    }
+
     private var applications: [IndexedApplication] = []
+    private var appearanceObservation: NSKeyValueObservation?
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -105,7 +157,27 @@ final class LauncherModel {
         } else {
             shortcut = .default
         }
+        if let savedTheme = defaults.object(forKey: Keys.theme) as? Int {
+            theme = AppTheme(rawValue: savedTheme) ?? .system
+        } else {
+            theme = .system
+        }
+        systemColorScheme = Self.colorScheme(for: NSApplication.shared.effectiveAppearance)
+        appearanceObservation = NSApplication.shared.observe(
+            \.effectiveAppearance,
+            options: [.new]
+        ) { [weak self] _, change in
+            guard let appearance = change.newValue else { return }
+            let scheme = Self.colorScheme(for: appearance)
+            Task { @MainActor in
+                self?.systemColorScheme = scheme
+            }
+        }
         rebuildResults()
+    }
+
+    nonisolated static func colorScheme(for appearance: NSAppearance) -> ColorScheme {
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .dark : .light
     }
 
     func prepareForPresentation() {
@@ -243,6 +315,10 @@ final class LauncherModel {
         shortcut = .default
     }
 
+    func updateTheme(_ theme: AppTheme) {
+        self.theme = theme
+    }
+
     private func rebuildResults() {
         let normalizedQuery = Self.normalized(query)
         var candidates = commandResults()
@@ -252,7 +328,7 @@ final class LauncherModel {
                 title: app.name,
                 subtitle: "Application",
                 symbolName: "app",
-                tint: Color(red: 0.90, green: 0.93, blue: 0.96),
+                tint: .blue,
                 icon: app.icon,
                 target: .application(app.url)
             )
@@ -282,7 +358,7 @@ final class LauncherModel {
                         title: "Search the web for “\(query)”",
                         subtitle: "Open in the default browser",
                         symbolName: "globe",
-                        tint: Color(red: 0.90, green: 0.94, blue: 0.92),
+                        tint: .green,
                         icon: nil,
                         target: .url(webURL)
                     )
@@ -299,7 +375,7 @@ final class LauncherModel {
                 title: "Beacon Settings",
                 subtitle: "Shortcut and launcher preferences",
                 symbolName: "gearshape.fill",
-                tint: Color(red: 0.94, green: 0.91, blue: 0.88),
+                tint: .clay,
                 icon: nil,
                 target: .settings
             ),
@@ -308,7 +384,7 @@ final class LauncherModel {
                 title: "Applications",
                 subtitle: "Open folder in Finder",
                 symbolName: "square.grid.2x2.fill",
-                tint: Color(red: 0.95, green: 0.92, blue: 0.88),
+                tint: .sand,
                 icon: nil,
                 target: .url(URL(filePath: "/Applications"))
             )
@@ -390,6 +466,7 @@ final class LauncherModel {
         static let keyCode = "launcherShortcutKeyCode"
         static let modifiers = "launcherShortcutModifiers"
         static let favoriteIDs = "launcherFavoriteIDs"
+        static let theme = "launcherTheme"
     }
 }
 
