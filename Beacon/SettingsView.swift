@@ -99,7 +99,8 @@ struct SettingsView: View {
         .padding(24)
         .frame(width: 560, alignment: .top)
         .background(Color.beaconCanvas(scheme))
-        .background(SettingsWindowFocusView(appearance: model.theme.appearance))
+        .background(SettingsWindowFocusView())
+        .preferredColorScheme(model.theme.colorScheme)
         .animation(.easeInOut(duration: 0.25), value: scheme)
         .accessibilityIdentifier("settingsView")
     }
@@ -211,29 +212,18 @@ private struct KeyCap: View {
 }
 
 private struct SettingsWindowFocusView: NSViewRepresentable {
-    let appearance: NSAppearance?
-
     func makeNSView(context: Context) -> SettingsWindowFocusingView {
-        let view = SettingsWindowFocusingView()
-        view.windowAppearance = appearance
-        return view
+        SettingsWindowFocusingView()
     }
 
-    func updateNSView(_ view: SettingsWindowFocusingView, context: Context) {
-        view.windowAppearance = appearance
-    }
+    func updateNSView(_ view: SettingsWindowFocusingView, context: Context) {}
 }
 
 private final class SettingsWindowFocusingView: NSView {
-    var windowAppearance: NSAppearance? {
-        didSet { window?.appearance = windowAppearance }
-    }
-
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         guard let window else { return }
 
-        window.appearance = windowAppearance
         window.tabbingMode = .disallowed
 
         DispatchQueue.main.async { [weak self] in
